@@ -73,6 +73,10 @@ module NodeT22 #(
     output reg [3:0] send             ///< Sending data to neighbor
 );
 
+///////////////////////////////////////////////////////////////////////////
+// Parameter Declarations
+///////////////////////////////////////////////////////////////////////////
+
 localparam REG_ACC   = 0;
 localparam REG_NIL   = 1;
 localparam REG_ANY   = 2;
@@ -82,23 +86,30 @@ localparam REG_1     = 5;
 localparam REG_2     = 6;
 localparam REG_3     = 7;
 
-reg [10:0] acc;
-reg [10:0] bak;
-reg [3:0] instrPointer;
+///////////////////////////////////////////////////////////////////////////
+// Signal Declarations
+///////////////////////////////////////////////////////////////////////////
+
+wire [15:0] instr;
+wire accZero;
+wire accNegative;
 
 reg [15:0] program[15:0]; ///< Program memory
 
-wire [15:0] instr;
-reg [3:0] nextInstrPointer;
-reg [10:0] nextAcc;
-reg [10:0] nextBak;
-reg [10:0] nextOutData;
-reg received;
+reg signed [10:0] acc;
+reg signed [10:0] bak;
+reg signed [10:0] nextAcc;
+reg signed [10:0] nextBak;
+reg signed [10:0] nextOutData;
 reg signed [10:0] src;
+reg [3:0] instrPointer;
+reg [3:0] nextInstrPointer;
+reg received;
 reg canGet;
 
-wire accZero;
-wire accNegative;
+///////////////////////////////////////////////////////////////////////////
+// Main Code
+///////////////////////////////////////////////////////////////////////////
 
 // Initialize program memory
 initial begin
@@ -152,8 +163,8 @@ always @(posedge clk) begin
     end
 end
 
-assign accZero = (acc == 0);
-assign accNegative = acc[10]; // Sign bit
+assign accZero = (acc == 11'd0);
+assign accNegative = acc[10];
 
 // CPU State machine
 always @(*) begin
@@ -238,7 +249,7 @@ always @(*) begin
             if (!accZero) nextInstrPointer = instr[9:6];
         end
         7'b110011? : begin // JGZ
-            if (!accNegative) nextInstrPointer = instr[9:6];
+            if (!accZero & !accNegative) nextInstrPointer = instr[9:6];
         end
         7'b110100? : begin // JLZ
             if (accNegative) nextInstrPointer = instr[9:6];
