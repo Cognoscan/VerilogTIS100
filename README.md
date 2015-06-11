@@ -48,7 +48,7 @@ Priority is given to 0, then 1, then 2, and then 3. To match the game, 0/1/2/3
 should correspond to LEFT/RIGHT/UP/DOWN.
 
 | Number  | Register   |
-| --      | --         |
+| ------- | ---------- |
 | 0       | nil        |
 | 1       | acc        |
 | 2       | any        |
@@ -75,7 +75,7 @@ colors and the option to skip updating a pixel, but otherwise functions the same
 as the in-game module.
 
 | Number | Color       |
-| --     | --          |
+| ------ | ----------- |
 | 0      | Black       |
 | 1      | Dark Grey   |
 | 2      | Bright Grey |
