@@ -107,6 +107,8 @@ reg [3:0] nextInstrPointer;
 reg [1:0] lastReg;
 reg [1:0] nextLast;
 reg [1:0] nextLastReg;
+reg movState;
+reg nextMovState;
 reg received;
 reg canGet;
 
@@ -148,12 +150,14 @@ always @(posedge clk) begin
         outData      <= 11'd0;
         lastReg      <= 2'd0;
         recv         <= 4'd0;
+        movState     <= 1'b0;
     end else begin
         instrPointer <= nextInstrPointer;
         acc          <= nextAcc;
         bak          <= nextBak;
         lastReg      <= nextLastReg;
         outData      <= nextOutData;
+        movState     <= nextMovState;
 
         if (received && (instr[10:8] > 1)) begin
             case (nextLastReg)
@@ -213,51 +217,53 @@ always @(*) begin
     nextBak          = bak;
     nextLastReg      = lastReg;
     nextOutData      = outData;
+    nextMovState     = movState;
     received         = 1'b0;
     send             = 4'b0000;
     casez (instr[15:9])
-        7'b0?????? : begin // MOV
+        7'b0?????? : begin // MOV (2 states)
             // Check if source is ready
-            if (canGet) begin
+            if (!movState && canGet) begin
+                nextOutData = src;
+                nextMovState = 1'b1;
+                nextInstrPointer = instrPointer; // Block
+                nextLastReg = nextLast;
+                received = instr[11];
+            end else if (movState) begin
                 // Check if destination is ready
                 case (instr[14:12])
                     REG_ACC : begin
-                        nextAcc = src;
-                        nextLastReg = nextLast;
-                        received = instr[11];
+                        nextAcc = outData;
+                        nextMovState = 1'b0;
                     end
                     REG_NIL : begin
-                        nextLastReg = nextLast;
-                        received = instr[11];
+                        nextMovState = 1'b0;
                     end
                     REG_ANY : begin
                         // Edge case: Sending to ANY means that multiple nodes could receive the data.
-                        nextOutData = src;
                         // Send out to all nodes
                         send = 4'b1111;
-                        // Accept done signal from any node
-                        if (|done) begin
-                            received = instr[11];
-                        end else begin
+                        // Block until a done signal is received
+                        if (~(|done)) begin
                             nextInstrPointer = instrPointer;
+                        end else begin
+                            nextMovState = 1'b0;
                         end
                     end
                     REG_LAST : begin
-                        nextOutData = src;
                         send[lastReg] = 1'b1;
-                        if (done[lastReg]) begin
-                            received = instr[11];
-                        end else begin
+                        if (~done[lastReg]) begin
                             nextInstrPointer = instrPointer;
+                        end else begin
+                            nextMovState = 1'b0;
                         end
                     end
                     REG_0, REG_1, REG_2, REG_3 : begin
-                        nextOutData = src;
                         send[instr[13:12]] = 1'b1;
-                        if (done[instr[13:12]]) begin
-                            received = instr[11];
-                        end else begin
+                        if (~done[instr[13:12]]) begin
                             nextInstrPointer = instrPointer; // Block
+                        end else begin
+                            nextMovState = 1'b0;
                         end
                     end
                 endcase
@@ -267,7 +273,8 @@ always @(*) begin
         end
         7'b100???? : begin // ADD / SUB
             if (canGet) begin
-                nextAcc = (instr[12]) ? acc - src : acc + src;
+                // Following adds/subtracts src based on instr[12]
+                nextAcc = acc + $signed(src ^ {11{instr[12]}}) + $signed({1'b0, instr[12]});
                 nextLastReg = nextLast;
                 // Strobe receive line if getting data from register
                 received = instr[11];

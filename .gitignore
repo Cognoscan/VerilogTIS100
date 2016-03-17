@@ -1,3 +1,7 @@
 *.swp
 modelsim.ini
 work/
+programs/
+build/
+transcript
+*.wlf
